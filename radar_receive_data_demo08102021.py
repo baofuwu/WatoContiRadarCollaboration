@@ -168,12 +168,10 @@ class PacketGroup:
     
     def append_far(self,packet):
         self.FarPackets[self.curFarBufId].append(packet)
-        print(f"len_FarPackets:{len(self.FarPackets)}")
         self.numFarPackets += 1
 
     def append_near(self,packet):
         self.NearPackets[self.curNearBufId].append(packet)
-        print(f"len_NearPackets:{len(self.NearPackets)}")
         self.numNearPackets += 1   
 
     def far_is_ready(self):
@@ -185,17 +183,13 @@ class PacketGroup:
         self.curNearBufId += 1
 
     def far_del(self):
-        print(f"before del farPackets[0] is {self.curFarBufId}")
         del self.FarPackets[0]
         self.curFarBufId -= 1
-        print(f"after del farPackets[0] is {self.curFarBufId}")
+
 
     def near_del(self):
-        print(f"before del farPackets[0] is {self.curNearBufId}")
         del self.NearPackets[0]
         self.curNearBufId -= 1
-        print(f"after del farPackets[0] is {self.curNearBufId}")
-
 
 
 # def loadRDIMessageFromPacket(newMsg, oldMsg):
@@ -233,8 +227,7 @@ class PacketGroup:
 #     return len(newMsg.Detections)
 
 def radar2pointcloud2(group) :
-  #  tf_br = tf.TransformBroadcaster()
-    
+
     pc = PointCloud2()
     pc.header = group.header
     pc.header.frame_id = "radar_fixed"
@@ -266,12 +259,12 @@ def radar2pointcloud2(group) :
     pc.point_step = 16 ##4 bytes for x, 4 bytes for y, 4 bytes for z, 4 bytes for intensity
     pc.is_dense = True
 
-    for i in range( group.size()):
+    for i in range(group.size()):
         for j in  range(group[i].Detections.size()):
             pc.width += 1
-            tmp = group[i].Detections[j].posX ##My computer is little endian (lsb @ lowest index)
-            for k in range(4):
-                pc.data.append(tmp[k])
+            tmp = group[i].Detections[j].posX ##Turn float32 into 4 bytes, My computer is little endian (lsb @ lowest index)
+            pc.data.append([tmp[0], tmp[1], tmp[2], tmp[3]])
+
             
             tmp = group[i].Detections[j].posY
             for k in range(4):
@@ -288,16 +281,7 @@ def radar2pointcloud2(group) :
                 pc.data.append(tmp[k])
             
     pc.row_step = pc.point_step * pc.width
-#     leftFOVLine.header.stamp = rightFOVline.header.stamp = pc.header.stamp
-
-#     tf_br.sendTransform(tf.StampedTransform(fixed, ros.Time.now(), "/base_link", BASE_FRAME))
-
-#     pcData.publish(pc)
-
-#     marker_pub.publish(leftFOVLine)
-#     marker_pub.publish(rightFOVline)
-
-#     return
+    return pc
 
 # curTimeStamp=0
 # def radarCallback(msg):
@@ -566,10 +550,6 @@ def receiveAndPackAndSendRadarData(sock, index):
           #  if detectionsInPacket!=0 and len(msg.Detections)!=0:
           #      print(f"msg.EventID:{msg.EventID},msg.TimeStamp:{msg.TimeStamp},len_msg.Detections:{len(msg.Detections)}")
                 
-                # #TODO
-                # pc_msg = PointCloud2() 
-                # pc_msg = radar2pointcloud2(msg)
-
 
             ######################save and publish pointcloud2 data########################
 
@@ -591,10 +571,14 @@ def receiveAndPackAndSendRadarData(sock, index):
 
                         if Near_is_Ready:
                             ## We just got a new TS for both near & far, so we should publish the old buffer
+                            # convert radar data into pc2 data
+                            pc_msg = PointCloud2() 
+                            pc_msg = radar2pointcloud2(msg)
+
                             # TODO:publish far and near and del old farpacket[0] and nearpacket[0]
-                            # publishPackets() 
-                            curGroup.far_del
-                            curGroup.near_del
+                            # publishPackets(pc_msg) 
+                            curGroup.far_del()
+                            curGroup.near_del()
                             Far_is_Ready = False
                             Near_is_Ready = False
 
@@ -615,10 +599,17 @@ def receiveAndPackAndSendRadarData(sock, index):
                         ##old far frame and near frame are both ready, pulish them together
                         if Far_is_Ready: 
                             ## We just got a new TS for both near & far, so we should publish the old buffer
+
+                            # convert radar data into pc2 data
+                            pc_msg = PointCloud2() 
+                            pc_msg = radar2pointcloud2(msg)
+                            print(f"pc_msg:{pc_msg.data}")
+
+
                             # TODO:publish far and near and del old farpacket[0] and nearpacket[0]
-                            # publishPackets() 
-                            curGroup.far_del
-                            curGroup.near_del
+                            # publishPackets(pc_msg) 
+                            curGroup.far_del()
+                            curGroup.near_del()
                             Far_is_Ready = False
                             Near_is_Ready = False
 
